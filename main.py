@@ -1,26 +1,73 @@
 import re
 
-# CR: This is called a "state"
-# CR: It's the thing that changes throut the running of this program
-# CR: Therefore - It should be represented as a class, where these are the members
-# CR: Also, add methods to the class like "read_commands", "run_next_command", things like that (basically what you have below)
 class RegState:
 
     registers = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     commands_list = []
     command_index = 0
 
-class MovReg:
+
+    def read_commands(self):
+        select_command_dic = {"MOV R R": self.creation_mov_reg, "MOV R #": self.creation_mov_num, "ADD R R": self.creation_add,"SUB R R": self.creation_sub}
+
+        with open('test.txt','r') as f:
+
+            for line in f:
+
+                  dic_key = " ".join([line[0:3], line[4], line[7]])
+                  select_command_dic[dic_key](line)
+
+    def run_next_command(self):
+
+                RegState.commands_list[self.command_index].run()
+                self.command_index+=1
+                print(RegState.registers)
+
+    def creation_mov_reg(self,line):
+
+        reg = re.findall(r'R\d', line)  # Extracting the Registers ID's
+        destRegister, sourceRegister = int(reg[0][1]), int(reg[1][1])
+        RegState.commands_list.append(MovReg(destRegister, sourceRegister))
+
+
+    def creation_mov_num(self,line):
+
+        destRegister = int(re.findall(r'R\d', line)[0][1])  # Extracting the Register's ID's
+        sourceNumber = int(re.findall(r'#\d', line)[0][1])  # Extracting The source number
+        RegState.commands_list.append(MovNum(destRegister, sourceNumber))
+
+
+    def creation_add(self,line):
+
+        reg = re.findall(r'R\d', line)
+        destRegister, sourceRegister1, sourceRegister2 = int(reg[0][1]), int(reg[1][1]), int(reg[2][1])  # Extracting the Registers ID's
+        RegState.commands_list.append(AddRegs(destRegister, sourceRegister1, sourceRegister2))
+
+
+    def creation_sub(self,line):
+        reg = re.findall(r'R\d', line)
+        destRegister, sourceRegister1, sourceRegister2 = int(reg[0][1]), int(reg[1][1]), int(reg[2][1])  # Extracting the Registers ID's
+        RegState.commands_list.append(SubRegs(destRegister, sourceRegister1, sourceRegister2))
+
+class BaseCommand:
+
+    def __init__(self, destRegister, sourceNumber, sourceRegister1,sourceRegister2):
+        self.destRegister = destRegister
+        self.sourceNumber = sourceNumber
+        self.sourceRegister1 = sourceRegister1
+        self.sourceRegister2 = sourceRegister2
+
+
+class MovReg(BaseCommand):
         def __init__(self, destRegister, sourceRegister):
             self.destRegister = destRegister
             self.sourceRegister = sourceRegister
 
-        # CR: If you'll call this function "run" in all the command classess you'd be able to run a command without knowing what it is!
         # CR: Also, you may want to make all the command classes inherit from "BaseCommand" that implements "run" as "raise NotImplementedError"
         # CR: If you are not familiar with / don't remember inheritance or exceptions - let me know :)
-        def run(self):
-            RegState.registers[destRegister] = RegState.registers[sourceRegister]
 
+        def run(self):
+            RegState.registers[self.destRegister] = RegState.registers[self.sourceRegister]
 
 class MovNum:
         def __init__(self, destRegister , sourceNumber):
@@ -28,18 +75,17 @@ class MovNum:
             self.sourceNumber = sourceNumber
 
         def run(self):
-            RegState.registers[destRegister] = sourceNumber
+            RegState.registers[self.destRegister] = self.sourceNumber
 
 
 class AddRegs:
-        # CR: Add a space after each ,
         def __init__(self,destRegister,sourceRegister1, sourceRegister2):
             self.destRegister = destRegister
             self.sourceRegister1 = sourceRegister1
             self.sourceRegister2 = sourceRegister2
 
         def run(self):
-            RegState.registers[destRegister] = RegState.registers[sourceRegister1] + RegState.registers[sourceRegister2]
+            RegState.registers[self.destRegister] = RegState.registers[self.sourceRegister1] + RegState.registers[self.sourceRegister2]
 
 class SubRegs:
         def __init__(self,destRegister,sourceRegister1, sourceRegister2):
@@ -48,53 +94,11 @@ class SubRegs:
             self.sourceRegister2 = sourceRegister2
 
         def run(self):
-            RegState.registers[destRegister] = RegState.registers[sourceRegister1] - RegState.registers[sourceRegister2]
+            RegState.registers[self.destRegister] = RegState.registers[self.sourceRegister1] - RegState.registers[self.sourceRegister2]
 
 
 print(RegState.registers)
-
-# CR: Instead of many else-ifs you can create a dictionary that maps a word to a "creator function"
-# CR: For example: { "MovReg": create_mov_reg, ... }
-# CR: As long as all of the creator functions would expect the same parameters you'd be fine
-# CR: (But what should be the parameters? the 2 sides of the ","? Perhaps the textual non-parsed command? IDK)
-with open('test.txt','r') as f:                                                # Parsing the assembly file
-
-    for line in f:
-        print(RegState.registers)
-        if re.findall("\AMOV", line):                                          #Checking for MOV call
-
-            if len(re.findall("R",line)) == 2:                                 #Checking for MOVReg
-
-               reg = re.findall(r'R\d',line)                                   # Extracting the Registers ID's
-               destRegister, sourceRegister = int(reg[0][1]),int(reg[1][1])    #Getting the registers numbers and saving them to the paramaters for the MovReg function
-               RegState.commands_list.append(MovReg(destRegister,sourceRegister))           #Declaring MovReg
-               RegState.commands_list[RegState.command_index].run()                                #Adiing MovReg object to the command list
-               RegState.command_index+=1
-
-            else:                                                              #In case this is a MovNum call
-
-                destRegister = int(re.findall(r'R\d', line)[0][1])             #Extracting the Register's ID's
-                sourceNumber = int(re.findall(r'#\d', line)[0][1])             #Extracting The source number
-                RegState.commands_list.append(MovNum(destRegister,sourceNumber))
-                RegState.commands_list[RegState.command_index].run()
-                RegState.command_index += 1
-
-                #Calling MovNum
-        elif re.findall("\AADD", line):                                        # Checking for ADD call
-            reg = re.findall(r'R\d', line)
-            destRegister, sourceRegister1, sourceRegister2 = int(reg[0][1]),int(reg[1][1]),int(reg[2][1])       # Extracting the Registers ID's
-
-            RegState.commands_list.append(AddRegs(destRegister, sourceRegister1, sourceRegister2))
-            RegState.commands_list[RegState.command_index].run()
-            RegState.command_index += 1
-
-        elif re.findall("\ASUB", line):                                                                          # Checking for SUB call
-            reg = re.findall(r'R\d', line)
-            destRegister, sourceRegister1, sourceRegister2 = int(reg[0][1]), int(reg[1][1]), int(reg[2][1])  # Extracting the Registers ID's
-
-            RegState.commands_list.append(SubRegs(destRegister, sourceRegister1, sourceRegister2))
-            RegState.commands_list[RegState.command_index].run()
-            RegState.command_index += 1
-
-print(RegState.registers)  #printing registers
-for i in RegState.commands_list: print(i.__repr__())
+s = RegState()
+s.read_commands()
+for i in range(len(s.commands_list)):
+    s.run_next_command()
